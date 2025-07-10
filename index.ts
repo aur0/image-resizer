@@ -7,11 +7,22 @@ serve({
   fetch: async (req: Request) => {
     const url = new URL(req.url);
     const imageUrl = url.searchParams.get("url");
-    const width = parseInt(url.searchParams.get("width") || "") || null;
-    const height = parseInt(url.searchParams.get("height") || "") || null;
+    const width = parseInt(url.searchParams.get("width") || "") || undefined;
+    const height = parseInt(url.searchParams.get("height") || "") || undefined;
 
     if (!imageUrl) {
       return new Response("Missing 'url' parameter", { status: 400 });
+    }
+
+    // Check Accept header for supported formats
+    const accept = req.headers.get("accept") || "";
+
+    // Decide output format
+    let format: "avif" | "webp" | "jpeg" = "jpeg";
+    if (accept.includes("image/avif")) {
+      format = "avif";
+    } else if (accept.includes("image/webp")) {
+      format = "webp";
     }
 
     try {
@@ -22,16 +33,31 @@ serve({
 
       const buffer = Buffer.from(await response.arrayBuffer());
 
-      const resized = await sharp(buffer)
-        .resize(width || undefined, height || undefined, {
-          fit: "inside",
-          withoutEnlargement: true,
-        })
-        .toBuffer();
+      // Start sharp pipeline
+      let pipeline = sharp(buffer).resize(width, height, {
+        fit: "inside",
+        withoutEnlargement: true,
+      });
 
-      return new Response(resized, {
+      // Convert format based on support
+      if (format === "avif") {
+        pipeline = pipeline.avif();
+      } else if (format === "webp") {
+        pipeline = pipeline.webp();
+      } else {
+        pipeline = pipeline.jpeg();
+      }
+
+      const outputBuffer = await pipeline.toBuffer();
+
+      return new Response(outputBuffer, {
         headers: {
-          "Content-Type": "image/jpeg",
+          "Content-Type":
+            format === "avif"
+              ? "image/avif"
+              : format === "webp"
+              ? "image/webp"
+              : "image/jpeg",
           "Cache-Control": "public, max-age=86400, immutable",
         },
       });
@@ -39,5 +65,5 @@ serve({
       return new Response("Error: " + err.message, { status: 500 });
     }
   },
-  port
+  port,
 });
