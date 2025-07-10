@@ -17,7 +17,10 @@ serve({
     if (url.searchParams.has("mobile")) {
       maxSize = 375;
     } else if (url.searchParams.has("desktop")) {
-      maxSize = 1920;
+      maxSize = 1920; // Default max width
+      if (url.searchParams.has("portrait")) {
+        maxSize = 1080; // Reasonable max height for portrait images
+      }
     }
 
     // Check Accept header for supported formats
