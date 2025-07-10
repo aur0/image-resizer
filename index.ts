@@ -7,17 +7,22 @@ serve({
   fetch: async (req: Request) => {
     const url = new URL(req.url);
     const imageUrl = url.searchParams.get("url");
-    const width = parseInt(url.searchParams.get("width") || "") || undefined;
-    const height = parseInt(url.searchParams.get("height") || "") || undefined;
 
     if (!imageUrl) {
       return new Response("Missing 'url' parameter", { status: 400 });
     }
 
+    // Decide max size based on device param
+    let maxSize: number | undefined;
+    if (url.searchParams.has("mobile")) {
+      maxSize = 375;
+    } else if (url.searchParams.has("desktop")) {
+      maxSize = 1920;
+    }
+
     // Check Accept header for supported formats
     const accept = req.headers.get("accept") || "";
 
-    // Decide output format
     let format: "avif" | "webp" | "jpeg" = "jpeg";
     if (accept.includes("image/avif")) {
       format = "avif";
@@ -33,11 +38,30 @@ serve({
 
       const buffer = Buffer.from(await response.arrayBuffer());
 
-      // Start sharp pipeline
-      let pipeline = sharp(buffer).resize(width, height, {
-        fit: "inside",
-        withoutEnlargement: true,
-      });
+      // Get image metadata to check width & height
+      const metadata = await sharp(buffer).metadata();
+
+      // Determine resize options based on largest edge
+      let resizeOptions: { width?: number; height?: number } = {};
+
+      if (maxSize && metadata.width && metadata.height) {
+        if (metadata.width >= metadata.height) {
+          // Landscape or square: constrain by width
+          resizeOptions.width = maxSize;
+        } else {
+          // Portrait: constrain by height
+          resizeOptions.height = maxSize;
+        }
+      }
+
+      // Start sharp pipeline with resize if needed
+      let pipeline = sharp(buffer);
+      if (resizeOptions.width || resizeOptions.height) {
+        pipeline = pipeline.resize(resizeOptions.width, resizeOptions.height, {
+          fit: "inside",
+          withoutEnlargement: true,
+        });
+      }
 
       // Convert format based on support
       if (format === "avif") {
