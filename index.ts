@@ -16,20 +16,15 @@ serve({
     let maxSize: number | undefined;
     if (url.searchParams.has("mobile")) {
       maxSize = 375;
-    } else if (url.searchParams.has("desktop")) {
-      maxSize = 1920; // Default max width
-      if (url.searchParams.has("portrait")) {
-        maxSize = 1080; // Reasonable max height for portrait images
-      }
+    } else {
+      maxSize = 1920; // Default max width for desktop
     }
 
     // Check Accept header for supported formats
     const accept = req.headers.get("accept") || "";
 
-    let format: "avif" | "webp" | "jpeg" = "jpeg";
-    if (accept.includes("image/avif")) {
-      format = "avif";
-    } else if (accept.includes("image/webp")) {
+    let format: "webp" | "jpeg" = "jpeg";
+    if (accept.includes("image/webp")) {
       format = "webp";
     }
 
@@ -44,16 +39,16 @@ serve({
       // Get image metadata to check width & height
       const metadata = await sharp(buffer).metadata();
 
-      // Determine resize options based on largest edge
+      // Determine resize options based on image dimensions
       let resizeOptions: { width?: number; height?: number } = {};
 
       if (maxSize && metadata.width && metadata.height) {
-        if (metadata.width >= metadata.height) {
-          // Landscape or square: constrain by width
-          resizeOptions.width = maxSize;
-        } else {
-          // Portrait: constrain by height
+        // If height is greater than width, it's portrait
+        if (metadata.height > metadata.width) {
           resizeOptions.height = maxSize;
+        } else {
+          // Otherwise, it's landscape or square
+          resizeOptions.width = maxSize;
         }
       }
 
@@ -67,9 +62,7 @@ serve({
       }
 
       // Convert format based on support
-      if (format === "avif") {
-        pipeline = pipeline.avif();
-      } else if (format === "webp") {
+      if (format === "webp") {
         pipeline = pipeline.webp();
       } else {
         pipeline = pipeline.jpeg();
@@ -79,12 +72,7 @@ serve({
 
       return new Response(outputBuffer, {
         headers: {
-          "Content-Type":
-            format === "avif"
-              ? "image/avif"
-              : format === "webp"
-              ? "image/webp"
-              : "image/jpeg",
+          "Content-Type": format === "webp" ? "image/webp" : "image/jpeg",
           "Cache-Control": "public, max-age=86400, immutable",
         },
       });
