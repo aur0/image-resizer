@@ -1,0 +1,11 @@
+[phases.setup]
+runner = "curl -fsSL https://bun.sh/install | bash"
+
+[phases.build]
+runner = "bun install"
+
+[phases.start]
+runner = "bun run index.ts"
+
+[env]
+PORT = "3000"
