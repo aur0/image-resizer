@@ -54,7 +54,7 @@ serve({
         }
       }
 
-      // Start with JPEG resize
+      // Start with basic sharp pipeline
       let pipeline = sharp(buffer);
       if (resizeOptions.width || resizeOptions.height) {
         pipeline = pipeline.resize(resizeOptions.width, resizeOptions.height, {
@@ -62,9 +62,6 @@ serve({
           withoutEnlargement: true,
         });
       }
-
-      // First convert to JPEG to reduce size
-      pipeline = pipeline.jpeg({ quality: 75 });
 
       try {
         // Try AVIF first if supported
@@ -86,10 +83,11 @@ serve({
             nearLossless: false
           });
         }
-        // If both fail, we already have a JPEG from the first conversion
+        // If both fail, fall back to JPEG
       } catch (error) {
-        // If AVIF/WebP conversion fails, we already have a JPEG
+        // If AVIF/WebP conversion fails, fall back to JPEG
         console.log("AVIF/WebP conversion failed, falling back to JPEG:", error);
+        pipeline = pipeline.jpeg({ quality: 75 });
       }
 
       const outputBuffer = await pipeline.toBuffer();
