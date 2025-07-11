@@ -69,7 +69,7 @@ serve({
           pipeline = pipeline.avif({
             quality: 75,
             lossless: false,
-            effort: 1,
+            effort: 3,
             chromaSubsampling: "4:2:0"
           });
         }
