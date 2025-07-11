@@ -23,8 +23,10 @@ serve({
     // Check Accept header for supported formats
     const accept = req.headers.get("accept") || "";
 
-    let format: "webp" | "jpeg" = "jpeg";
-    if (accept.includes("image/webp")) {
+    let format: "avif" | "webp" | "jpeg" = "jpeg";
+    if (accept.includes("image/avif")) {
+      format = "avif";
+    } else if (accept.includes("image/webp")) {
       format = "webp";
     }
 
@@ -62,13 +64,20 @@ serve({
       }
 
       // Convert format based on support
-      if (format === "webp") {
+      if (format === "avif") {
+        pipeline = pipeline.avif({
+          quality: 75,                    // Keep as needed
+          lossless: false,               // Required for lossy, which is much faster
+          effort: 6,                      // Range: 0 (slowest) to 8 (fastest)
+          chromaSubsampling: "4:2:0"     // Lower quality but faster/smaller
+        });        
+      } else if (format === "webp") {
         pipeline = pipeline.webp({ 
-          quality: 75,           // Adjust lower for more savings
-          effort: 6,             // Max compression effort
-          smartSubsample: true,  // Helpful for gradients, text, etc.
-          lossless: false,       // Keep false unless you're targeting lossless
-          nearLossless: false    // Only useful for PNGs and when visual fidelity is critical
+          quality: 75,
+          effort: 6,
+          smartSubsample: true,
+          lossless: false,
+          nearLossless: false
         });
       } else {
         pipeline = pipeline.jpeg({ quality: 75 });
@@ -78,7 +87,7 @@ serve({
 
       return new Response(outputBuffer, {
         headers: {
-          "Content-Type": format === "webp" ? "image/webp" : "image/jpeg",
+          "Content-Type": format === "avif" ? "image/avif" : format === "webp" ? "image/webp" : "image/jpeg",
           "Cache-Control": "public, max-age=86400, immutable",
         },
       });
