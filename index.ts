@@ -63,9 +63,15 @@ serve({
 
       // Convert format based on support
       if (format === "webp") {
-        pipeline = pipeline.webp();
+        pipeline = pipeline.webp({ 
+          quality: 75,           // Adjust lower for more savings
+          effort: 6,             // Max compression effort
+          smartSubsample: true,  // Helpful for gradients, text, etc.
+          lossless: false,       // Keep false unless you're targeting lossless
+          nearLossless: false    // Only useful for PNGs and when visual fidelity is critical
+        });
       } else {
-        pipeline = pipeline.jpeg();
+        pipeline = pipeline.jpeg({ quality: 75 });
       }
 
       const outputBuffer = await pipeline.toBuffer();
