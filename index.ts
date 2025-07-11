@@ -23,10 +23,8 @@ serve({
     // Check Accept header for supported formats
     const accept = req.headers.get("accept") || "";
 
-    let format: "avif" | "webp" | "jpeg" = "jpeg";
-    if (accept.includes("image/avif")) {
-      format = "avif";
-    } else if (accept.includes("image/webp")) {
+    let format: "webp" | "jpeg" = "jpeg";
+    if (accept.includes("image/webp")) {
       format = "webp";
     }
 
@@ -54,8 +52,10 @@ serve({
         }
       }
 
-      // Start with basic sharp pipeline
+      // Start with basic sharp pipeline and chain resize and format conversion
       let pipeline = sharp(buffer);
+      
+      // Chain resize operation if needed
       if (resizeOptions.width || resizeOptions.height) {
         pipeline = pipeline.resize(resizeOptions.width, resizeOptions.height, {
           fit: "inside",
@@ -63,42 +63,31 @@ serve({
         });
       }
 
-      try {
-        // Try AVIF first if supported
-        if (format === "avif") {
-          pipeline = pipeline.avif({
-            quality: 75,
-            lossless: false,
-            effort: 6,
-            chromaSubsampling: "4:2:0"
-          });
-        }
-        // Then try WebP if AVIF fails
-        else if (format === "webp") {
-          pipeline = pipeline.webp({ 
-            quality: 75,
-            effort: 6,
-            smartSubsample: true,
-            lossless: false,
-            nearLossless: false
-          });
-        }
-        // If both fail, fall back to JPEG
-      } catch (error) {
-        // If AVIF/WebP conversion fails, fall back to JPEG
-        console.log("AVIF/WebP conversion failed, falling back to JPEG:", error);
+      // Chain format conversion
+      if (format === "webp") {
+        pipeline = pipeline.webp({ 
+          quality: 60,
+          effort: 6,
+          smartSubsample: true,
+          lossless: false,
+          nearLossless: false
+        });
+      } else {
         pipeline = pipeline.jpeg({ quality: 75 });
       }
 
-      const outputBuffer = await pipeline.toBuffer();
+      try {
+        const outputBuffer = await pipeline.toBuffer();
 
-      return new Response(outputBuffer, {
-        headers: {
-          "Content-Type": format === "avif" ? "image/avif" : 
-                   format === "webp" ? "image/webp" : "image/jpeg",
-          "Cache-Control": "public, max-age=86400, immutable",
-        },
-      });
+        return new Response(outputBuffer, {
+          headers: {
+            "Content-Type": format === "webp" ? "image/webp" : "image/jpeg",
+            "Cache-Control": "public, max-age=86400, immutable",
+          },
+        });
+      } catch (err: any) {
+        return new Response("Error: " + err.message, { status: 500 });
+      }
     } catch (err: any) {
       return new Response("Error: " + err.message, { status: 500 });
     }
